@@ -2,6 +2,20 @@
 
 Vent is a simple type-based event system for generic purposes.
 
+## Installation with Gradle
+
+Add the following to your repositories:
+
+```
+maven { url 'https://jitpack.io' }
+```
+
+And the following to your dependencies:
+
+```
+compile 'com.github.manabreak:vent:1.0'
+```
+
 ## Usage
 
 Either create a new event system:
