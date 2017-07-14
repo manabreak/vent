@@ -185,6 +185,84 @@ public class EventSystemTest {
         verify(afterProcessor).onEvent(eq(event));
     }
 
+    @Test
+    public void testAfterAny() {
+        q.subscribe(TestEvent.class, eventProcessor);
+
+        EventProcessor afterAnyProcessor = mock(EventProcessor.class);
+        q.afterAny(afterAnyProcessor);
+
+        TestEvent event = new TestEvent();
+        q.post(event);
+        q.process();
+
+        verify(afterAnyProcessor).onEvent(eq(event));
+
+        TestEventTwo eventTwo = new TestEventTwo();
+        q.post(eventTwo);
+        q.process();
+
+        verify(afterAnyProcessor).onEvent(eq(eventTwo));
+    }
+
+    @Test
+    public void testBeforeAny() {
+        q.subscribe(TestEvent.class, eventProcessor);
+
+        EventProcessor beforeAnyProcessor = mock(EventProcessor.class);
+        q.beforeAny(beforeAnyProcessor);
+
+        TestEvent event = new TestEvent();
+        q.post(event);
+        q.process();
+
+        verify(beforeAnyProcessor).onEvent(eq(event));
+
+        TestEventTwo eventTwo = new TestEventTwo();
+        q.post(eventTwo);
+        q.process();
+
+        verify(beforeAnyProcessor).onEvent(eq(eventTwo));
+    }
+
+    @Test
+    public void testAfterAny_Immediate() {
+        q.subscribe(TestEvent.class, eventProcessor);
+
+        EventProcessor afterAnyProcessor = mock(EventProcessor.class);
+        q.afterAny(afterAnyProcessor);
+
+        TestEvent event = new TestEvent();
+        q.post(event);
+        q.process();
+
+        verify(afterAnyProcessor).onEvent(eq(event));
+
+        TestEventTwo eventTwo = new TestEventTwo();
+        q.post(eventTwo);
+        q.process();
+
+        verify(afterAnyProcessor).onEvent(eq(eventTwo));
+    }
+
+    @Test
+    public void testBeforeAny_Immediate() {
+        q.subscribe(TestEvent.class, eventProcessor);
+
+        EventProcessor beforeAnyProcessor = mock(EventProcessor.class);
+        q.beforeAny(beforeAnyProcessor);
+
+        TestEvent event = new TestEvent();
+        q.postImmediate(event);
+
+        verify(beforeAnyProcessor).onEvent(eq(event));
+
+        TestEventTwo eventTwo = new TestEventTwo();
+        q.postImmediate(eventTwo);
+
+        verify(beforeAnyProcessor).onEvent(eq(eventTwo));
+    }
+
     public static class TestEvent {
         public String message;
     }

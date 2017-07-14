@@ -28,6 +28,8 @@ public class EventSystem<BaseEvent> {
     private final List<EventQueue> queues = new ArrayList<>();
     private final List<Subscription> beforeHandlers = new ArrayList<>();
     private final List<Subscription> afterHandlers = new ArrayList<>();
+    private final List<EventProcessor> beforeAnyProcessors = new ArrayList<>();
+    private final List<EventProcessor> afterAnyProcessors = new ArrayList<>();
 
     /**
      * Total number of queued events.
@@ -78,6 +80,14 @@ public class EventSystem<BaseEvent> {
         getSubscription(eventType, afterHandlers).eventProcessors.add(processor);
     }
 
+    public void beforeAny(EventProcessor processor) {
+        beforeAnyProcessors.add(processor);
+    }
+
+    public void afterAny(EventProcessor processor) {
+        afterAnyProcessors.add(processor);
+    }
+
     /**
      * Subscribe to a certain event type.
      * <p>
@@ -117,6 +127,10 @@ public class EventSystem<BaseEvent> {
         Subscription<T> before = getSubscription((Class<T>) event.getClass(), beforeHandlers);
         Subscription<T> after = getSubscription((Class<T>) event.getClass(), afterHandlers);
 
+        for (EventProcessor eventProcessor : beforeAnyProcessors) {
+            eventProcessor.onEvent(event);
+        }
+
         for (EventProcessor<T> eventProcessor : before.eventProcessors) {
             eventProcessor.onEvent(event);
         }
@@ -129,6 +143,10 @@ public class EventSystem<BaseEvent> {
         }
 
         for (EventProcessor<T> eventProcessor : after.eventProcessors) {
+            eventProcessor.onEvent(event);
+        }
+
+        for (EventProcessor eventProcessor : afterAnyProcessors) {
             eventProcessor.onEvent(event);
         }
     }
@@ -161,6 +179,10 @@ public class EventSystem<BaseEvent> {
             for (int j = 0, d = queue.events.size(); j < d; ++j) {
                 Object event = queue.events.get(j);
 
+                for (EventProcessor eventProcessor : beforeAnyProcessors) {
+                    eventProcessor.onEvent(event);
+                }
+
                 for (EventProcessor eventProcessor : before.eventProcessors) {
                     eventProcessor.onEvent(event);
                 }
@@ -176,8 +198,9 @@ public class EventSystem<BaseEvent> {
                     eventProcessor.onEvent(event);
                 }
 
-                // Pools.free(event);
-                // TODO Callback for "event handled"
+                for (EventProcessor eventProcessor : afterAnyProcessors) {
+                    eventProcessor.onEvent(event);
+                }
             }
             queue.events.clear();
         }
