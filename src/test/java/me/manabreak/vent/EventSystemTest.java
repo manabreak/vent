@@ -8,11 +8,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
 public class EventSystemTest {
@@ -23,12 +19,14 @@ public class EventSystemTest {
     private EventProcessor<TestEvent> eventProcessor;
     @Mock
     private EventProcessor<TestEvent> consumingEventProcessor;
+    @Mock
+    private EventProcessor<TestEventTwo> eventTwoProcessor;
 
     @Before
     public void setUp() {
         q = new EventSystem();
-        when(eventProcessor.onEvent(any())).thenReturn(false);
-        when(consumingEventProcessor.onEvent(any())).thenReturn(true);
+        when(eventProcessor.onEvent(any(TestEvent.class))).thenReturn(false);
+        when(consumingEventProcessor.onEvent(any(TestEvent.class))).thenReturn(true);
     }
 
     @Test
@@ -39,7 +37,7 @@ public class EventSystemTest {
         event.message = "Hello";
 
         q.post(event);
-        verify(eventProcessor, never()).onEvent(any());
+        verify(eventProcessor, never()).onEvent(any(TestEvent.class));
 
         q.process();
         verify(eventProcessor).onEvent(eq(event));
@@ -261,6 +259,25 @@ public class EventSystemTest {
         q.postImmediate(eventTwo);
 
         verify(beforeAnyProcessor).onEvent(eq(eventTwo));
+    }
+
+    @Test
+    public void testEventPostedDuringProcess() {
+        q.subscribe(TestEventTwo.class, eventTwoProcessor);
+        q.subscribe(TestEvent.class, new EventProcessor() {
+            @Override
+            public boolean onEvent(Object event) {
+                q.post(new TestEventTwo());
+                return false;
+            }
+        });
+
+        q.post(new TestEvent());
+        q.process();
+        verify(eventTwoProcessor, never()).onEvent(any(TestEventTwo.class));
+
+        q.process();
+        verify(eventTwoProcessor).onEvent(any(TestEventTwo.class));
     }
 
     public static class TestEvent {

@@ -22,6 +22,7 @@ import java.util.List;
  *                    inherit a common base type. This can be omitted
  *                    if no base event class is required.
  */
+@SuppressWarnings("WeakerAccess")
 public class EventSystem<BaseEvent> {
 
     private final List<Subscription> subscriptions = new ArrayList<>();
@@ -31,14 +32,19 @@ public class EventSystem<BaseEvent> {
     private final List<EventProcessor> beforeAnyProcessors = new ArrayList<>();
     private final List<EventProcessor> afterAnyProcessors = new ArrayList<>();
 
+    private final List<BaseEvent> queuedEvents = new ArrayList<>();
+
     /**
      * Total number of queued events.
      */
     private int queueSize = 0;
 
+    private boolean processing = false;
+
     private static <T> Subscription<T> getSubscription(Class<T> clazz, List<Subscription> subscriptions) {
         for (Subscription s : subscriptions) {
-            if (s.clazz == clazz) return s;
+            if (s.clazz == clazz) //noinspection unchecked
+                return s;
         }
 
         Subscription<T> s = new Subscription<>(clazz);
@@ -48,7 +54,10 @@ public class EventSystem<BaseEvent> {
 
     private <T extends BaseEvent> EventQueue<T> getQueue(Class<T> clazz) {
         for (EventQueue queue : queues) {
-            if (queue.clazz == clazz) return queue;
+            if (queue.clazz == clazz) {
+                //noinspection unchecked
+                return queue;
+            }
         }
 
         EventQueue<T> q = new EventQueue<>(clazz);
@@ -59,10 +68,10 @@ public class EventSystem<BaseEvent> {
     /**
      * Adds a processor to be invoked before any other "normal" processors are invoked.
      *
-     * @param eventType
-     * @param processor
-     * @param <T>
-     * @param <P>
+     * @param eventType Type of the event
+     * @param processor Processor to invoke
+     * @param <T>       Event type
+     * @param <P>       Processor type
      */
     public <T extends BaseEvent, P extends EventProcessor<T>> void before(Class<T> eventType, P processor) {
         getSubscription(eventType, beforeHandlers).eventProcessors.add(processor);
@@ -71,19 +80,29 @@ public class EventSystem<BaseEvent> {
     /**
      * Adds a processor to be invoked after all "normal" processors are invoked.
      *
-     * @param eventType
-     * @param processor
-     * @param <T>
-     * @param <P>
+     * @param eventType Type of the event
+     * @param processor Processor to invoke
+     * @param <T>       Event type
+     * @param <P>       Processor type
      */
     public <T extends BaseEvent, P extends EventProcessor<T>> void after(Class<T> eventType, P processor) {
         getSubscription(eventType, afterHandlers).eventProcessors.add(processor);
     }
 
+    /**
+     * Adds a processor to be invoked before any other processing takes place.
+     *
+     * @param processor to invoke
+     */
     public void beforeAny(EventProcessor processor) {
         beforeAnyProcessors.add(processor);
     }
 
+    /**
+     * Adds a processor to be invoked after all other processing has been done.
+     *
+     * @param processor to invoke
+     */
     public void afterAny(EventProcessor processor) {
         afterAnyProcessors.add(processor);
     }
@@ -123,11 +142,15 @@ public class EventSystem<BaseEvent> {
      * @param <T>   Type of the event
      */
     public <T extends BaseEvent> void postImmediate(T event) {
+        //noinspection unchecked
         Subscription<T> s = getSubscription((Class<T>) event.getClass(), subscriptions);
+        //noinspection unchecked
         Subscription<T> before = getSubscription((Class<T>) event.getClass(), beforeHandlers);
+        //noinspection unchecked
         Subscription<T> after = getSubscription((Class<T>) event.getClass(), afterHandlers);
 
         for (EventProcessor eventProcessor : beforeAnyProcessors) {
+            //noinspection unchecked
             eventProcessor.onEvent(event);
         }
 
@@ -147,6 +170,7 @@ public class EventSystem<BaseEvent> {
         }
 
         for (EventProcessor eventProcessor : afterAnyProcessors) {
+            //noinspection unchecked
             eventProcessor.onEvent(event);
         }
     }
@@ -158,9 +182,15 @@ public class EventSystem<BaseEvent> {
      * @param <T>   Type of the event
      */
     public <T extends BaseEvent> void post(T event) {
-        EventQueue queue = getQueue((Class<T>) event.getClass());
-        queue.events.add(event);
-        queueSize++;
+        if (processing) {
+            queuedEvents.add(event);
+        } else {
+            //noinspection unchecked
+            EventQueue queue = getQueue((Class<T>) event.getClass());
+            //noinspection unchecked
+            queue.events.add(event);
+            queueSize++;
+        }
     }
 
     /**
@@ -169,25 +199,27 @@ public class EventSystem<BaseEvent> {
     public void process() {
         if (queueSize == 0) return;
 
-        // for (EventQueue queue : queues) {
-        for (int i = 0, c = queues.size(); i < c; ++i) {
-            EventQueue queue = queues.get(i);
+        processing = true;
+
+        for (EventQueue queue : queues) {
             Subscription<?> s = getSubscription(queue.clazz, subscriptions);
             Subscription<?> before = getSubscription(queue.clazz, beforeHandlers);
             Subscription<?> after = getSubscription(queue.clazz, afterHandlers);
-            // for (Object event : queue.events) {
             for (int j = 0, d = queue.events.size(); j < d; ++j) {
                 Object event = queue.events.get(j);
 
                 for (EventProcessor eventProcessor : beforeAnyProcessors) {
+                    //noinspection unchecked
                     eventProcessor.onEvent(event);
                 }
 
                 for (EventProcessor eventProcessor : before.eventProcessors) {
+                    //noinspection unchecked
                     eventProcessor.onEvent(event);
                 }
 
                 for (EventProcessor eventProcessor : s.eventProcessors) {
+                    //noinspection unchecked
                     boolean consume = eventProcessor.onEvent(event);
                     if (consume) {
                         break;
@@ -195,17 +227,25 @@ public class EventSystem<BaseEvent> {
                 }
 
                 for (EventProcessor eventProcessor : after.eventProcessors) {
+                    //noinspection unchecked
                     eventProcessor.onEvent(event);
                 }
 
                 for (EventProcessor eventProcessor : afterAnyProcessors) {
+                    //noinspection unchecked
                     eventProcessor.onEvent(event);
                 }
             }
             queue.events.clear();
         }
 
+        processing = false;
         queueSize = 0;
+
+        for (BaseEvent event : queuedEvents) {
+            post(event);
+        }
+        queuedEvents.clear();
     }
 
     /**
