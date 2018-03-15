@@ -13,7 +13,7 @@ maven { url 'https://jitpack.io' }
 And the following to your dependencies:
 
 ```
-compile 'com.github.manabreak:vent:1.0'
+compile 'com.github.manabreak:vent:1.2'
 ```
 
 ## Usage
@@ -81,3 +81,15 @@ You shouldn't usually create new events using the `new` operator,
 at least not in performance-critical programs such as games.
 Instead, create new ones only when you need them, and re-use existing
 events.
+
+
+## Events posted during processing
+
+If an event handler posts an event in response to some other event, this
+newly posted event will be queued up for the next processing cycle. This
+means that you can do stuff like this:
+
+    EventSystem.subscribe(FooEvent.class, foo -> EventSystem.post(new BarEvent());
+    EventSystem.post(new FooEvent());
+    EventSystem.process(); // The FooEvent will be processed and BarEvent will be queued
+    EventSystem.process(); // BarEvent will be processed
